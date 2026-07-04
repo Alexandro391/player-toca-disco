@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toca-discos — Player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --wood-1:#3a2a1c;
+    --wood-2:#5c4028;
+    --wood-3:#2a1d13;
+    --steel-1:#232326;
+    --steel-2:#131315;
+    --steel-3:#3a3a3f;
+    --cream:#e9d9ae;
+    --cream-2:#d9c48f;
+    --brass:#c9a24a;
+    --brass-light:#f0d382;
+    --paper:#ece3d0;
+    --ink:#1c1712;
+    --amber:#e0a458;
+    --amber-dim:#7a5a30;
+  }
+
+  *{box-sizing:border-box;}
+
+  html,body{
+    height:100%;
+    margin:0;
+    background:
+      radial-gradient(ellipse at 50% -10%, #2a2420 0%, #14110d 55%, #0a0908 100%);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow-x:hidden;
+  }
+
+  .stage{
+    width:min(94vw, 720px);
+    padding:clamp(16px,3vw,28px);
+  }
+
+  .eyebrow{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:14px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:#8c7f6a;
+  }
+  .eyebrow b{color:var(--amber); font-weight:500;}
+
+  /* ===== Cabinet ===== */
+  .cabinet{
+    position:relative;
+    border-radius:14px;
+    padding:clamp(18px,3.4vw,34px);
+    background:
+      repeating-linear-gradient(100deg, rgba(0,0,0,0.08) 0 2px, transparent 2px 5px),
+      linear-gradient(160deg, var(--wood-2), var(--wood-1) 55%, var(--wood-3));
+    box-shadow:
+      0 30px 60px -20px rgba(0,0,0,.7),
+      inset 0 1px 0 rgba(255,255,255,.06),
+      inset 0 0 40px rgba(0,0,0,.35);
+    border:1px solid rgba(0,0,0,.5);
+  }
+
+  .deck{
+    position:relative;
+    border-radius:8px;
+    background:linear-gradient(155deg, var(--steel-1), var(--steel-2) 70%);
+    padding:clamp(16px,3vw,30px);
+    box-shadow:
+      inset 0 2px 6px rgba(0,0,0,.6),
+      inset 0 0 0 1px rgba(255,255,255,.03);
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:clamp(14px,3vw,26px);
+    align-items:center;
+  }
+
+  /* ===== Platter / record ===== */
+  .platterWrap{
+    position:relative;
+    aspect-ratio:1/1;
+    width:100%;
+    max-width:420px;
+    justify-self:center;
+  }
+
+  .platter{
+    position:absolute; inset:0;
+    border-radius:50%;
+    background:
+      radial-gradient(circle at 50% 50%, #444 0 2%, #2b2b2d 2% 100%);
+    box-shadow:
+      0 10px 24px rgba(0,0,0,.6),
+      inset 0 0 0 6px #1c1c1e,
+      inset 0 0 0 8px #3a3a3d;
+  }
+
+  .record{
+    position:absolute; inset:4%;
+    border-radius:50%;
+    background:
+      repeating-radial-gradient(circle at 50% 50%,
+        #101012 0, #101012 1.1%,
+        #1c1c1e 1.1%, #1c1c1e 2.1%);
+    box-shadow:
+      0 2px 10px rgba(0,0,0,.6),
+      inset 0 0 30px rgba(0,0,0,.5);
+    animation:spin 1.8s linear infinite;
+    animation-play-state:paused;
+    transform-origin:50% 50%;
+  }
+  .record::before{
+    /* light sweep for a glossy vinyl feel */
+    content:"";
+    position:absolute; inset:0;
+    border-radius:50%;
+    background:conic-gradient(from 200deg,
+      rgba(255,255,255,0) 0deg,
+      rgba(255,255,255,.06) 40deg,
+      rgba(255,255,255,0) 80deg,
+      rgba(255,255,255,0) 360deg);
+  }
+  .record.spinning{ animation-play-state:running; }
+
+  .label{
+    position:absolute;
+    left:50%; top:50%;
+    transform:translate(-50%,-50%);
+    width:36%; height:36%;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--cream), var(--cream-2) 75%);
+    box-shadow:0 0 0 2px rgba(0,0,0,.3), 0 4px 10px rgba(0,0,0,.5);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:6%;
+    overflow:hidden;
+  }
+  .label .title{
+    font-family:'Fraunces', serif;
+    font-size:clamp(10px,1.6vw,13px);
+    font-weight:600;
+    color:var(--ink);
+    line-height:1.15;
+    max-width:100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .label .artist{
+    font-family:'JetBrains Mono', monospace;
+    font-size:clamp(7px,1.1vw,9px);
+    letter-spacing:.06em;
+    color:#5b4a2c;
+    margin-top:3px;
+    text-transform:uppercase;
+  }
+  .spindle{
+    position:absolute; left:50%; top:50%;
+    width:5%; height:5%;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--brass-light), var(--brass) 70%, #7a5c22);
+    box-shadow:0 0 0 1px rgba(0,0,0,.4);
+    z-index:5;
+  }
+
+  /* ===== Tonearm ===== */
+  .tonearmPivot{
+    position:absolute;
+    right:-2%;
+    top:-4%;
+    width:16%;
+    height:16%;
+    z-index:6;
+  }
+  .tonearmBase{
+    position:absolute; inset:0;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #d8d8dc, #8d8d92 60%, #5c5c60);
+    box-shadow:0 3px 8px rgba(0,0,0,.5);
+  }
+  .tonearmBase::after{
+    content:"";
+    position:absolute; left:50%; top:50%;
+    width:34%; height:34%;
+    transform:translate(-50%,-50%);
+    border-radius:50%;
+    background:#2a2a2c;
+  }
+
+  .tonearm{
+    position:absolute;
+    left:50%; top:50%;
+    width:6px;
+    height:min(46vw,190px);
+    max-height:56%;
+    background:linear-gradient(90deg,#cfcfd4,#e9e9ee 45%,#b9b9be);
+    border-radius:4px;
+    transform-origin:top center;
+    transform:translate(-50%,0) rotate(-24deg);
+    transition:transform 1.1s cubic-bezier(.65,0,.35,1);
+    box-shadow:0 2px 4px rgba(0,0,0,.4);
+  }
+  .tonearm.playing{ transform:translate(-50%,0) rotate(7deg); }
+
+  .headshell{
+    position:absolute;
+    bottom:-4px; left:50%;
+    transform:translateX(-50%) rotate(28deg);
+    width:34px;
+    background:linear-gradient(160deg,#3a3a3d,#18181a);
+    border-radius:2px 2px 6px 6px;
+    padding:4px;
+  }
+  .headshell::after{
+    content:"";
+    display:block;
+    width:100%; height:10px;
+    background:repeating-linear-gradient(90deg,#666 0 2px, transparent 2px 5px);
+    border-radius:0 0 3px 3px;
+  }
+  .stylus{
+    position:absolute;
+    bottom:-6px; left:50%;
+    width:2px; height:8px;
+    background:var(--brass-light);
+    transform:translateX(-50%);
+  }
+
+  /* ===== Side control panel ===== */
+  .panel{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:clamp(10px,2vw,18px);
+    padding:10px 4px;
+  }
+  .readout{
+    width:100%;
+    background:#0c0d0a;
+    border-radius:5px;
+    padding:8px 10px;
+    box-shadow:inset 0 0 8px rgba(0,0,0,.8), inset 0 0 0 1px rgba(255,255,255,.03);
+    text-align:center;
+    min-width:118px;
+  }
+  .readout .track{
+    font-family:'Fraunces',serif;
+    font-size:13px;
+    color:var(--amber);
+    text-shadow:0 0 6px rgba(224,164,88,.5);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .readout .time{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:#c98a3f;
+    margin-top:4px;
+    letter-spacing:.05em;
+  }
+
+  .transport{
+    display:flex;
+    gap:10px;
+  }
+  .btn{
+    width:42px; height:42px;
+    border-radius:50%;
+    border:none;
+    cursor:pointer;
+    background:radial-gradient(circle at 35% 30%, #4a4a4e, #222224 70%);
+    box-shadow:0 3px 6px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.06);
+    color:var(--cream);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover{ box-shadow:0 3px 10px rgba(224,164,88,.35), inset 0 0 0 1px rgba(255,255,255,.1); }
+  .btn:active{ transform:scale(.92); }
+  .btn.main{
+    width:52px; height:52px;
+    background:radial-gradient(circle at 35% 30%, var(--brass-light), var(--brass) 65%, #7a5c22);
+    color:#241a08;
+  }
+  .btn svg{ width:16px; height:16px; }
+  .btn.main svg{ width:18px; height:18px; }
+
+  .switches{
+    display:flex;
+    gap:14px;
+    margin-top:4px;
+  }
+  .switchGroup{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+  }
+  .switchGroup label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    letter-spacing:.08em;
+    color:#8c7f6a;
+    text-transform:uppercase;
+  }
+  .toggle{
+    width:26px; height:44px;
+    border-radius:13px;
+    background:linear-gradient(180deg,#151517,#0c0c0d);
+    box-shadow:inset 0 0 6px rgba(0,0,0,.8);
+    position:relative;
+    cursor:pointer;
+    border:1px solid #000;
+  }
+  .toggle .knob{
+    position:absolute;
+    left:50%;
+    top:4px;
+    width:18px; height:18px;
+    border-radius:50%;
+    transform:translateX(-50%);
+    background:radial-gradient(circle at 35% 30%, #d8d8dc, #85858a);
+    box-shadow:0 2px 3px rgba(0,0,0,.5);
+    transition:top .2s ease;
+  }
+  .toggle.on .knob{ top:22px; background:radial-gradient(circle at 35% 30%, var(--brass-light), var(--brass)); }
+
+  .volKnobWrap{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .volKnob{
+    width:44px; height:44px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #55555a, #232326 70%);
+    box-shadow:0 3px 6px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.05);
+    position:relative;
+    cursor:grab;
+  }
+  .volKnob::after{
+    content:"";
+    position:absolute;
+    left:50%; top:6px;
+    width:2px; height:12px;
+    background:var(--brass-light);
+    transform-origin:50% 16px;
+    transform:translateX(-50%) rotate(var(--rot,-120deg));
+  }
+  .volKnobWrap label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    letter-spacing:.08em;
+    color:#8c7f6a;
+    text-transform:uppercase;
+  }
+
+  .progressRow{
+    grid-column:1/-1;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:2px;
+  }
+  .progressRow .t{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    color:#8c7f6a;
+    min-width:34px;
+  }
+  input[type=range]{
+    -webkit-appearance:none;
+    flex:1;
+    height:3px;
+    border-radius:2px;
+    background:#3a3a3d;
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:12px; height:12px;
+    border-radius:50%;
+    background:var(--brass-light);
+    box-shadow:0 0 6px rgba(224,164,88,.6);
+    cursor:pointer;
+    margin-top:-4.5px;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:3px; border-radius:2px; background:#3a3a3d;
+  }
+
+  .screwRow{
+    display:flex;
+    justify-content:space-between;
+    padding:0 2px;
+    margin-top:14px;
+  }
+  .screw{
+    width:6px; height:6px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #6b5535, #2a2013);
+  }
+
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ===== Crate / playlist ===== */
+  .crate{
+    margin-top:16px;
+    border-radius:10px;
+    background:linear-gradient(160deg,#241a10,#160f09);
+    border:1px solid rgba(0,0,0,.5);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 10px 22px -14px rgba(0,0,0,.7);
+    overflow:hidden;
+  }
+  .crateHeader{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:12px 16px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:#a8916a;
+    border-bottom:1px solid rgba(255,255,255,.06);
+    flex-wrap:wrap;
+  }
+  .crateHeader .right{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .loadBtn{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    border:1px solid rgba(224,164,88,.4);
+    background:linear-gradient(160deg,rgba(224,164,88,.14),rgba(224,164,88,.04));
+    color:var(--amber);
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:7px 12px;
+    border-radius:20px;
+    cursor:pointer;
+    transition:background .15s ease, box-shadow .15s ease;
+    white-space:nowrap;
+  }
+  .loadBtn:hover{ background:rgba(224,164,88,.22); box-shadow:0 0 10px rgba(224,164,88,.25); }
+  .loadBtn svg{ width:12px; height:12px; }
+  .offlineNote{
+    font-family:'Inter',sans-serif;
+    text-transform:none;
+    letter-spacing:0;
+    font-size:11px;
+    color:#6b5f4c;
+    padding:0 16px 12px;
+  }
+  .trackList{
+    list-style:none;
+    margin:0;
+    padding:6px;
+    max-height:260px;
+    overflow-y:auto;
+  }
+  .trackItem{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:10px 10px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  .trackItem:hover{ background:rgba(255,255,255,.04); }
+  .trackItem.active{ background:rgba(224,164,88,.12); }
+  .trackItem .num{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:#8c7f6a;
+    width:20px;
+    text-align:right;
+    flex-shrink:0;
+  }
+  .trackItem.active .num{ color:var(--amber); }
+  .trackItem .meta{ flex:1; min-width:0; }
+  .trackItem .name{
+    font-family:'Fraunces',serif;
+    font-size:14px;
+    color:var(--paper);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .trackItem.active .name{ color:var(--amber); }
+  .trackItem .by{
+    font-family:'Inter',sans-serif;
+    font-size:11px;
+    color:#8c7f6a;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .trackItem .eq{
+    width:14px; height:14px;
+    flex-shrink:0;
+    display:flex;
+    align-items:flex-end;
+    gap:2px;
+    opacity:0;
+  }
+  .trackItem.active .eq{ opacity:1; }
+  .trackItem .eq span{
+    width:3px;
+    background:var(--amber);
+    border-radius:1px;
+    animation:eq 0.9s ease-in-out infinite;
+  }
+  .trackItem .eq span:nth-child(1){ height:40%; animation-delay:0s; }
+  .trackItem .eq span:nth-child(2){ height:100%; animation-delay:.2s; }
+  .trackItem .eq span:nth-child(3){ height:65%; animation-delay:.4s; }
+  @keyframes eq{ 0%,100%{ transform:scaleY(.4); } 50%{ transform:scaleY(1); } }
+
+  @media (max-width:560px){
+    .deck{ grid-template-columns:1fr; }
+    .panel{ flex-direction:row; flex-wrap:wrap; justify-content:center; }
+    .readout{ min-width:0; width:100%; }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    .record{ animation:none !important; }
+    .tonearm{ transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="eyebrow"><span>High Fidelity · Modelo <b>HF-33</b></span><span>Rotação: <span id="rpmLabel">33⅓</span> RPM</span></div>
+
+  <div class="cabinet">
+    <div class="deck">
+
+      <div class="platterWrap">
+        <div class="platter">
+          <div class="record" id="record">
+            <div class="label">
+              <div class="title" id="trackTitle">Nenhum disco</div>
+              <div class="artist" id="trackArtist">carregue um áudio</div>
+            </div>
+          </div>
+          <div class="spindle"></div>
+        </div>
+
+        <div class="tonearmPivot">
+          <div class="tonearmBase"></div>
+          <div class="tonearm" id="tonearm">
+            <div class="headshell">
+              <div class="stylus"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="readout">
+          <div class="track" id="readoutTrack">— : —</div>
+          <div class="time"><span id="curTime">0:00</span> / <span id="durTime">0:00</span></div>
+        </div>
+
+        <div class="transport">
+          <button class="btn" id="prevBtn" title="Faixa anterior" aria-label="Faixa anterior">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6L9 12l11 6z"/></svg>
+          </button>
+          <button class="btn main" id="playBtn" title="Reproduzir" aria-label="Reproduzir">
+            <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+          <button class="btn" id="nextBtn" title="Próxima faixa" aria-label="Próxima faixa">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6l11 6-11 6z"/></svg>
+          </button>
+        </div>
+
+        <div class="switches">
+          <div class="switchGroup">
+            <div class="toggle on" id="speedToggle"><div class="knob"></div></div>
+            <label id="speedLbl">45</label>
+          </div>
+          <div class="volKnobWrap">
+            <div class="volKnob" id="volKnob"></div>
+            <label>Vol</label>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="progressRow">
+        <span class="t" id="curTime2">0:00</span>
+        <input type="range" id="seek" min="0" max="100" value="0">
+        <span class="t" id="durTime2">0:00</span>
+      </div>
+
+    </div>
+
+    <div class="screwRow">
+      <div class="screw"></div><div class="screw"></div><div class="screw"></div><div class="screw"></div>
+    </div>
+  </div>
+
+  <div class="crate">
+    <div class="crateHeader">
+      <span>Coleção <span id="crateCount">0 discos</span></span>
+      <span class="right">
+        <label class="loadBtn" for="fileInput">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l4 4h-3v6h-2V7H8l4-4zM5 19h14v2H5z"/></svg>
+          Carregar do dispositivo
+        </label>
+        <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
+      </span>
+    </div>
+    <div class="offlineNote">Os áudios carregados aqui ficam salvos apenas nesta sessão do navegador (não são enviados a nenhum servidor) e tocam normalmente sem internet.</div>
+    <ul class="trackList" id="trackList"></ul>
+  </div>
+</div>
+
+<audio id="audio"></audio>
+
+<script>
+(function(){
+  // =========================================================================
+  // PLAYLIST FIXA — edite este array com as suas músicas.
+  // "src" deve apontar para o caminho do arquivo de áudio relativo a este
+  // arquivo HTML quando publicado (ex.: pasta "musicas/" ao lado do HTML).
+  // =========================================================================
+  let PLAYLIST = [
+    { title: "Nome da Faixa 1", artist: "Artista 1", src: "musicas/faixa1.mp3" },
+    { title: "Nome da Faixa 2", artist: "Artista 2", src: "musicas/faixa2.mp3" },
+    { title: "Nome da Faixa 3", artist: "Artista 3", src: "musicas/faixa3.mp3" },
+  ];
+
+  const audio = document.getElementById('audio');
+  const record = document.getElementById('record');
+  const tonearm = document.getElementById('tonearm');
+  const playBtn = document.getElementById('playBtn');
+  const playIcon = document.getElementById('playIcon');
+  const trackTitle = document.getElementById('trackTitle');
+  const trackArtist = document.getElementById('trackArtist');
+  const readoutTrack = document.getElementById('readoutTrack');
+  const curTime = document.getElementById('curTime');
+  const durTime = document.getElementById('durTime');
+  const curTime2 = document.getElementById('curTime2');
+  const durTime2 = document.getElementById('durTime2');
+  const seek = document.getElementById('seek');
+  const speedToggle = document.getElementById('speedToggle');
+  const speedLbl = document.getElementById('speedLbl');
+  const rpmLabel = document.getElementById('rpmLabel');
+  const volKnob = document.getElementById('volKnob');
+  const trackListEl = document.getElementById('trackList');
+  const crateCount = document.getElementById('crateCount');
+  const fileInput = document.getElementById('fileInput');
+
+  const ICON_PLAY = '<path d="M8 5v14l11-7z"/>';
+  const ICON_PAUSE = '<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>';
+
+  let currentIndex = -1;
+  audio.volume = 0.8;
+
+  function fmt(s){
+    if(!isFinite(s)) return '0:00';
+    const m = Math.floor(s/60);
+    const sec = Math.floor(s%60).toString().padStart(2,'0');
+    return m+':'+sec;
+  }
+
+  function setPlayingUI(playing){
+    record.classList.toggle('spinning', playing);
+    tonearm.classList.toggle('playing', playing);
+    playIcon.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+  }
+
+  function shortLabel(name){ return name.length > 22 ? name.slice(0,20)+'…' : name; }
+  function shortReadout(name){ return name.length > 16 ? name.slice(0,14)+'…' : name; }
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function renderCrate(){
+    crateCount.textContent = PLAYLIST.length + (PLAYLIST.length===1 ? ' disco' : ' discos');
+    trackListEl.innerHTML = '';
+    PLAYLIST.forEach((t, i)=>{
+      const li = document.createElement('li');
+      li.className = 'trackItem' + (i===currentIndex ? ' active' : '');
+      li.innerHTML =
+        '<span class="num">'+String(i+1).padStart(2,'0')+'</span>'+
+        '<span class="meta"><div class="name">'+escapeHtml(t.title)+'</div><div class="by">'+escapeHtml(t.artist)+'</div></span>'+
+        '<span class="eq"><span></span><span></span><span></span></span>';
+      li.addEventListener('click', ()=> loadTrack(i, true));
+      trackListEl.appendChild(li);
+    });
+  }
+
+  // Remove a extensão do nome do arquivo para usar como título (ex.: "musica.mp3" -> "musica")
+  function nameWithoutExt(filename){
+    const idx = filename.lastIndexOf('.');
+    return idx > 0 ? filename.slice(0, idx) : filename;
+  }
+
+  // Carrega arquivos de áudio escolhidos no dispositivo do usuário.
+  // Usa URL.createObjectURL, então funciona 100% offline (sem enviar nada a servidor).
+  function handleLocalFiles(fileList){
+    const files = Array.from(fileList).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac)$/i.test(f.name));
+    if(files.length === 0) return;
+
+    const wasEmpty = PLAYLIST.length === 0;
+    const insertAt = PLAYLIST.length;
+
+    files.forEach(file=>{
+      PLAYLIST.push({
+        title: nameWithoutExt(file.name),
+        artist: 'Do dispositivo',
+        src: URL.createObjectURL(file),
+        isLocal: true
+      });
+    });
+
+    renderCrate();
+
+    // Se não havia nada tocando, carrega e toca automaticamente a primeira faixa adicionada.
+    if(currentIndex === -1 || wasEmpty){
+      loadTrack(insertAt, true);
+    }
+  }
+
+  fileInput.addEventListener('change', (e)=>{
+    handleLocalFiles(e.target.files);
+    fileInput.value = ''; // permite selecionar os mesmos arquivos novamente depois
+  });
+
+  function loadTrack(i, autoplay){
+    if(i < 0 || i >= PLAYLIST.length) return;
+    currentIndex = i;
+    const t = PLAYLIST[i];
+    audio.src = t.src;
+    trackTitle.textContent = shortLabel(t.title);
+    trackArtist.textContent = t.artist;
+    readoutTrack.textContent = shortReadout(t.title);
+    renderCrate();
+    if(autoplay) audio.play();
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    if(currentIndex === -1){ loadTrack(0, true); return; }
+    if(audio.paused){ audio.play(); } else { audio.pause(); }
+  });
+
+  audio.addEventListener('play', ()=> setPlayingUI(true));
+  audio.addEventListener('pause', ()=> setPlayingUI(false));
+  audio.addEventListener('ended', ()=>{
+    setPlayingUI(false);
+    if(currentIndex < PLAYLIST.length - 1) loadTrack(currentIndex + 1, true);
+  });
+
+  audio.addEventListener('loadedmetadata', ()=>{
+    durTime.textContent = fmt(audio.duration);
+    durTime2.textContent = fmt(audio.duration);
+    seek.max = Math.floor(audio.duration) || 100;
+  });
+
+  audio.addEventListener('timeupdate', ()=>{
+    curTime.textContent = fmt(audio.currentTime);
+    curTime2.textContent = fmt(audio.currentTime);
+    if(!seek.dragging) seek.value = Math.floor(audio.currentTime);
+  });
+
+  seek.addEventListener('input', ()=>{
+    audio.currentTime = seek.value;
+  });
+
+  document.getElementById('prevBtn').addEventListener('click', ()=>{
+    if(currentIndex > 0) loadTrack(currentIndex - 1, true);
+    else audio.currentTime = 0;
+  });
+  document.getElementById('nextBtn').addEventListener('click', ()=>{
+    if(currentIndex < PLAYLIST.length - 1) loadTrack(currentIndex + 1, true);
+  });
+
+  renderCrate();
+
+  speedToggle.addEventListener('click', ()=>{
+    fastSpeed = !fastSpeed;
+    speedToggle.classList.toggle('on', fastSpeed);
+    speedLbl.textContent = fastSpeed ? '45' : '33';
+    rpmLabel.textContent = fastSpeed ? '45' : '33⅓';
+    record.style.animationDuration = fastSpeed ? '1.333s' : '1.8s';
+  });
+  record.style.animationDuration = '1.333s';
+
+  // Volume knob: drag vertically to adjust, rotates -120deg..120deg
+  let dragging = false, startY = 0, startVol = audio.volume;
+  function setKnobRotation(v){
+    const deg = -120 + v*240;
+    volKnob.style.setProperty('--rot', deg+'deg');
+  }
+  setKnobRotation(audio.volume);
+
+  volKnob.addEventListener('pointerdown', (e)=>{
+    dragging = true; startY = e.clientY; startVol = audio.volume;
+    volKnob.setPointerCapture(e.pointerId);
+  });
+  volKnob.addEventListener('pointermove', (e)=>{
+    if(!dragging) return;
+    const delta = (startY - e.clientY) / 120;
+    const v = Math.min(1, Math.max(0, startVol + delta));
+    audio.volume = v;
+    setKnobRotation(v);
+  });
+  volKnob.addEventListener('pointerup', ()=> dragging = false);
+  volKnob.addEventListener('pointerleave', ()=> dragging = false);
+})();
+</script>
+
+</body>
+</html>
