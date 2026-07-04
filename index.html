@@ -4,6 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Toca-discos — Player</title>
+
+<!-- PWA: manifest, ícones e cor de tema -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3a2a1c">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Toca-discos">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -832,6 +842,17 @@
   });
   volKnob.addEventListener('pointerup', ()=> dragging = false);
   volKnob.addEventListener('pointerleave', ()=> dragging = false);
+
+  // Registra o service worker para permitir uso offline e instalação como app.
+  // Precisa ser servido via http/https (funciona em GitHub Pages) — não funciona
+  // abrindo o arquivo direto como file:// no navegador.
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(err=>{
+        console.warn('Falha ao registrar o service worker:', err);
+      });
+    });
+  }
 })();
 </script>
 
