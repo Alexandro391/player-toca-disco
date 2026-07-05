@@ -5,7 +5,7 @@
 // (ex.: 'toca-discos-v2') para forçar a atualização do cache nos celulares.
 // ============================================================================
 
-const CACHE_NAME = 'toca-discos-v1';
+const CACHE_NAME = 'toca-discos-v2';
 
 // Arquivos do "esqueleto" do app — precisam existir na mesma pasta do sw.js
 const APP_SHELL = [
