@@ -546,6 +546,23 @@
   .trackItem .eq span:nth-child(3){ height:65%; animation-delay:.4s; }
   @keyframes eq{ 0%,100%{ transform:scaleY(.4); } 50%{ transform:scaleY(1); } }
 
+  .trackItem .delBtn{
+    flex-shrink:0;
+    width:22px; height:22px;
+    border-radius:50%;
+    border:none;
+    background:transparent;
+    color:#8c7f6a;
+    font-size:15px;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:background .15s ease, color .15s ease;
+  }
+  .trackItem .delBtn:hover{ background:rgba(224,120,88,.18); color:#e07a58; }
+
   @media (max-width:560px){
     .deck{ grid-template-columns:1fr; }
     .panel{ flex-direction:row; flex-wrap:wrap; justify-content:center; }
@@ -642,7 +659,7 @@
         <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
       </span>
     </div>
-    <div class="offlineNote">Os áudios carregados aqui ficam salvos apenas nesta sessão do navegador (não são enviados a nenhum servidor) e tocam normalmente sem internet.</div>
+    <div class="offlineNote">Os áudios carregados aqui ficam salvos no armazenamento deste navegador (não são enviados a nenhum servidor). Você só precisa carregar cada música uma vez — ela continua disponível nas próximas visitas, mesmo offline.</div>
     <ul class="trackList" id="trackList"></ul>
   </div>
 </div>
@@ -719,8 +736,16 @@
       li.innerHTML =
         '<span class="num">'+String(i+1).padStart(2,'0')+'</span>'+
         '<span class="meta"><div class="name">'+escapeHtml(t.title)+'</div><div class="by">'+escapeHtml(t.artist)+'</div></span>'+
-        '<span class="eq"><span></span><span></span><span></span></span>';
+        '<span class="eq"><span></span><span></span><span></span></span>'+
+        (t.isLocal ? '<button class="delBtn" title="Remover do dispositivo" aria-label="Remover">&times;</button>' : '');
       li.addEventListener('click', ()=> loadTrack(i, true));
+      const delBtn = li.querySelector('.delBtn');
+      if(delBtn){
+        delBtn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          removeTrack(i);
+        });
+      }
       trackListEl.appendChild(li);
     });
   }
@@ -731,8 +756,89 @@
     return idx > 0 ? filename.slice(0, idx) : filename;
   }
 
+  // =========================================================================
+  // Armazenamento persistente (IndexedDB): guarda os arquivos de áudio
+  // localmente no navegador para que não precisem ser recarregados a cada
+  // visita. Nada é enviado a servidor algum.
+  // =========================================================================
+  const DB_NAME = 'tocaDiscosDB';
+  const DB_STORE = 'tracks';
+  let dbPromise = null;
+
+  function openDB(){
+    if(dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject)=>{
+      if(!('indexedDB' in window)){ reject(new Error('IndexedDB indisponível')); return; }
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = (e)=>{
+        const db = e.target.result;
+        if(!db.objectStoreNames.contains(DB_STORE)){
+          db.createObjectStore(DB_STORE, { keyPath:'id' });
+        }
+      };
+      req.onsuccess = ()=> resolve(req.result);
+      req.onerror = ()=> reject(req.error);
+    });
+    return dbPromise;
+  }
+
+  async function dbPutTrack(record){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).put(record);
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+
+  async function dbGetAllTracks(){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(DB_STORE, 'readonly');
+      const req = tx.objectStore(DB_STORE).getAll();
+      req.onsuccess = ()=> resolve(req.result || []);
+      req.onerror = ()=> reject(req.error);
+    });
+  }
+
+  async function dbDeleteTrack(id){
+    const db = await openDB();
+    return new Promise((resolve, reject)=>{
+      const tx = db.transaction(DB_STORE, 'readwrite');
+      tx.objectStore(DB_STORE).delete(id);
+      tx.oncomplete = ()=> resolve();
+      tx.onerror = ()=> reject(tx.error);
+    });
+  }
+
+  function makeId(){
+    return (crypto.randomUUID ? crypto.randomUUID() : 'id-'+Date.now()+'-'+Math.random().toString(16).slice(2));
+  }
+
+  // Carrega no player as faixas já salvas no IndexedDB de visitas anteriores.
+  async function loadSavedTracks(){
+    try{
+      const rows = await dbGetAllTracks();
+      rows.forEach(row=>{
+        PLAYLIST.push({
+          id: row.id,
+          title: row.title,
+          artist: row.artist,
+          src: URL.createObjectURL(row.blob),
+          isLocal: true
+        });
+      });
+      renderCrate();
+    }catch(err){
+      console.warn('Não foi possível carregar músicas salvas:', err);
+    }
+  }
+
   // Carrega arquivos de áudio escolhidos no dispositivo do usuário.
-  // Usa URL.createObjectURL, então funciona 100% offline (sem enviar nada a servidor).
+  // Usa URL.createObjectURL para tocar imediatamente e também salva o
+  // arquivo no IndexedDB para que fique disponível nas próximas visitas
+  // sem precisar carregar de novo (funciona 100% offline).
   function handleLocalFiles(fileList){
     const files = Array.from(fileList).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac)$/i.test(f.name));
     if(files.length === 0) return;
@@ -741,11 +847,21 @@
     const insertAt = PLAYLIST.length;
 
     files.forEach(file=>{
+      const id = makeId();
+      const title = nameWithoutExt(file.name);
+      const artist = 'Do dispositivo';
+
       PLAYLIST.push({
-        title: nameWithoutExt(file.name),
-        artist: 'Do dispositivo',
+        id,
+        title,
+        artist,
         src: URL.createObjectURL(file),
         isLocal: true
+      });
+
+      // Salva o arquivo (Blob) no IndexedDB em segundo plano.
+      dbPutTrack({ id, title, artist, blob: file }).catch(err=>{
+        console.warn('Não foi possível salvar a música para uso offline:', err);
       });
     });
 
@@ -755,6 +871,33 @@
     if(currentIndex === -1 || wasEmpty){
       loadTrack(insertAt, true);
     }
+  }
+
+  // Remove uma faixa carregada do dispositivo (da lista e do armazenamento persistente).
+  function removeTrack(i){
+    const t = PLAYLIST[i];
+    if(!t || !t.isLocal) return;
+
+    if(t.id) dbDeleteTrack(t.id).catch(err=> console.warn('Falha ao remover música salva:', err));
+    try{ URL.revokeObjectURL(t.src); }catch(e){}
+
+    const wasCurrent = (i === currentIndex);
+    PLAYLIST.splice(i, 1);
+
+    if(wasCurrent){
+      audio.pause();
+      audio.removeAttribute('src');
+      currentIndex = -1;
+      trackTitle.textContent = 'Nenhum disco';
+      trackArtist.textContent = 'carregue um áudio';
+      readoutTrack.textContent = '— : —';
+      curTime.textContent = '0:00'; durTime.textContent = '0:00';
+      curTime2.textContent = '0:00'; durTime2.textContent = '0:00';
+    } else if(i < currentIndex){
+      currentIndex -= 1;
+    }
+
+    renderCrate();
   }
 
   fileInput.addEventListener('change', (e)=>{
@@ -811,6 +954,7 @@
   });
 
   renderCrate();
+  loadSavedTracks();
 
   speedToggle.addEventListener('click', ()=>{
     fastSpeed = !fastSpeed;
