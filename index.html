@@ -37,21 +37,24 @@
   *{box-sizing:border-box;}
 
   html,body{
-    height:100%;
+    min-height:100dvh;
+    height:auto;
     margin:0;
     background:
       radial-gradient(ellipse at 50% -10%, #2a2420 0%, #14110d 55%, #0a0908 100%);
     color:var(--paper);
     font-family:'Inter',sans-serif;
     display:flex;
-    align-items:center;
+    align-items:flex-start;
     justify-content:center;
     overflow-x:hidden;
+    overflow-y:auto;
   }
 
   .stage{
     width:min(94vw, 720px);
     padding:clamp(16px,3vw,28px);
+    margin:auto;
   }
 
   .eyebrow{
@@ -66,6 +69,34 @@
     color:#8c7f6a;
   }
   .eyebrow b{color:var(--amber); font-weight:500;}
+
+  /* ===== Theme swatches ===== */
+  .themeRow{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    margin-bottom:12px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:10px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:#8c7f6a;
+    flex-wrap:wrap;
+  }
+  .themeSwatch{
+    width:20px; height:20px;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.15);
+    background:var(--sw);
+    cursor:pointer;
+    padding:0;
+    box-shadow:0 2px 4px rgba(0,0,0,.4);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .themeSwatch:hover{ transform:scale(1.15); }
+  .themeSwatch.active{
+    box-shadow:0 0 0 2px #0a0908, 0 0 0 4px var(--sw), 0 2px 6px rgba(0,0,0,.5);
+  }
 
   /* ===== Cabinet ===== */
   .cabinet{
@@ -101,7 +132,7 @@
     position:relative;
     aspect-ratio:1/1;
     width:100%;
-    max-width:420px;
+    max-width:min(420px, 58vh, 92vw);
     justify-self:center;
   }
 
@@ -378,6 +409,30 @@
     text-transform:uppercase;
   }
 
+  .mixerSection{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:9px;
+    width:100%;
+    margin-top:6px;
+    padding-top:12px;
+    border-top:1px solid rgba(255,255,255,.06);
+  }
+  .mixerLabel{
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:#8c7f6a;
+  }
+  .mixer{
+    display:flex;
+    gap:clamp(10px,2.4vw,18px);
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+
   .progressRow{
     grid-column:1/-1;
     display:flex;
@@ -580,6 +635,16 @@
 <div class="stage">
   <div class="eyebrow"><span>High Fidelity · Modelo <b>HF-33</b></span><span>Rotação: <span id="rpmLabel">33⅓</span> RPM</span></div>
 
+  <div class="themeRow" id="themeRow">
+    <span>Cor:</span>
+    <button class="themeSwatch active" data-theme="gold" style="--sw:#c9a24a" title="Dourado" aria-label="Tema dourado"></button>
+    <button class="themeSwatch" data-theme="blue" style="--sw:#4a8ec9" title="Azul" aria-label="Tema azul"></button>
+    <button class="themeSwatch" data-theme="red" style="--sw:#c9524a" title="Vermelho" aria-label="Tema vermelho"></button>
+    <button class="themeSwatch" data-theme="green" style="--sw:#4ac97a" title="Verde" aria-label="Tema verde"></button>
+    <button class="themeSwatch" data-theme="purple" style="--sw:#a24ac9" title="Roxo" aria-label="Tema roxo"></button>
+    <button class="themeSwatch" data-theme="silver" style="--sw:#b7bcc4" title="Prata" aria-label="Tema prata"></button>
+  </div>
+
   <div class="cabinet">
     <div class="deck">
 
@@ -630,6 +695,24 @@
           <div class="volKnobWrap">
             <div class="volKnob" id="volKnob"></div>
             <label>Vol</label>
+          </div>
+        </div>
+
+        <div class="mixerSection">
+          <div class="mixerLabel">Mesa de Som</div>
+          <div class="mixer">
+            <div class="volKnobWrap">
+              <div class="volKnob" id="bassKnob"></div>
+              <label>Graves</label>
+            </div>
+            <div class="volKnobWrap">
+              <div class="volKnob" id="trebleKnob"></div>
+              <label>Agudos</label>
+            </div>
+            <div class="volKnobWrap">
+              <div class="volKnob" id="modKnob"></div>
+              <label>Modul.</label>
+            </div>
           </div>
         </div>
 
@@ -696,6 +779,10 @@
   const speedLbl = document.getElementById('speedLbl');
   const rpmLabel = document.getElementById('rpmLabel');
   const volKnob = document.getElementById('volKnob');
+  const bassKnob = document.getElementById('bassKnob');
+  const trebleKnob = document.getElementById('trebleKnob');
+  const modKnob = document.getElementById('modKnob');
+  const themeRow = document.getElementById('themeRow');
   const trackListEl = document.getElementById('trackList');
   const crateCount = document.getElementById('crateCount');
   const fileInput = document.getElementById('fileInput');
@@ -738,7 +825,7 @@
         '<span class="meta"><div class="name">'+escapeHtml(t.title)+'</div><div class="by">'+escapeHtml(t.artist)+'</div></span>'+
         '<span class="eq"><span></span><span></span><span></span></span>'+
         (t.isLocal ? '<button class="delBtn" title="Remover do dispositivo" aria-label="Remover">&times;</button>' : '');
-      li.addEventListener('click', ()=> loadTrack(i, true));
+      li.addEventListener('click', ()=>{ resumeAudioGraph(); loadTrack(i, true); });
       const delBtn = li.querySelector('.delBtn');
       if(delBtn){
         delBtn.addEventListener('click', (e)=>{
@@ -918,6 +1005,7 @@
   }
 
   playBtn.addEventListener('click', ()=>{
+    resumeAudioGraph();
     if(currentIndex === -1){ loadTrack(0, true); return; }
     if(audio.paused){ audio.play(); } else { audio.pause(); }
   });
@@ -965,27 +1053,132 @@
   });
   record.style.animationDuration = '1.333s';
 
-  // Volume knob: drag vertically to adjust, rotates -120deg..120deg
-  let dragging = false, startY = 0, startVol = audio.volume;
-  function setKnobRotation(v){
-    const deg = -120 + v*240;
-    volKnob.style.setProperty('--rot', deg+'deg');
-  }
-  setKnobRotation(audio.volume);
+  // =========================================================================
+  // Knob genérico: arraste verticalmente para ajustar qualquer controle
+  // rotativo (volume, graves, agudos, modulação), girando de -120° a 120°.
+  // =========================================================================
+  function makeKnob(el, opts){
+    let value = opts.value;
+    function render(){
+      const pct = (value - opts.min) / (opts.max - opts.min);
+      const deg = -120 + pct*240;
+      el.style.setProperty('--rot', deg+'deg');
+    }
+    render();
+    opts.onChange(value, true);
 
-  volKnob.addEventListener('pointerdown', (e)=>{
-    dragging = true; startY = e.clientY; startVol = audio.volume;
-    volKnob.setPointerCapture(e.pointerId);
+    let dragging = false, startY = 0, startVal = value;
+    el.addEventListener('pointerdown', (e)=>{
+      dragging = true; startY = e.clientY; startVal = value;
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener('pointermove', (e)=>{
+      if(!dragging) return;
+      const delta = (startY - e.clientY) / 120;
+      let v = startVal + delta*(opts.max - opts.min);
+      v = Math.min(opts.max, Math.max(opts.min, v));
+      value = v;
+      render();
+      opts.onChange(v, false);
+    });
+    el.addEventListener('pointerup', ()=> dragging = false);
+    el.addEventListener('pointerleave', ()=> dragging = false);
+    return { set:(v)=>{ value = v; render(); } };
+  }
+
+  makeKnob(volKnob, { min:0, max:1, value:audio.volume, onChange:(v)=>{ audio.volume = v; } });
+
+  // =========================================================================
+  // Mesa de som: grafo Web Audio com graves (lowshelf), agudos (highshelf)
+  // e modulação (trêmulo via LFO). Criado sob demanda, na primeira interação
+  // do usuário, para respeitar as políticas de autoplay dos navegadores.
+  // =========================================================================
+  let audioCtx = null, sourceNode = null, bassFilter = null, trebleFilter = null;
+  let modGain = null, lfo = null, lfoGain = null;
+
+  function initAudioGraph(){
+    if(audioCtx) return;
+    try{
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      sourceNode = audioCtx.createMediaElementSource(audio);
+
+      bassFilter = audioCtx.createBiquadFilter();
+      bassFilter.type = 'lowshelf';
+      bassFilter.frequency.value = 200;
+      bassFilter.gain.value = 0;
+
+      trebleFilter = audioCtx.createBiquadFilter();
+      trebleFilter.type = 'highshelf';
+      trebleFilter.frequency.value = 3000;
+      trebleFilter.gain.value = 0;
+
+      modGain = audioCtx.createGain();
+      modGain.gain.value = 1;
+
+      lfo = audioCtx.createOscillator();
+      lfo.frequency.value = 4;
+      lfoGain = audioCtx.createGain();
+      lfoGain.gain.value = 0; // profundidade da modulação, começa desligada
+      lfo.connect(lfoGain);
+      lfoGain.connect(modGain.gain);
+      lfo.start();
+
+      sourceNode.connect(bassFilter);
+      bassFilter.connect(trebleFilter);
+      trebleFilter.connect(modGain);
+      modGain.connect(audioCtx.destination);
+    }catch(err){
+      console.warn('Mesa de som indisponível neste navegador:', err);
+    }
+  }
+
+  function resumeAudioGraph(){
+    initAudioGraph();
+    if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  makeKnob(bassKnob, { min:-15, max:15, value:0, onChange:(v, initial)=>{
+    if(!initial) resumeAudioGraph();
+    if(bassFilter) bassFilter.gain.value = v;
+  } });
+  makeKnob(trebleKnob, { min:-15, max:15, value:0, onChange:(v, initial)=>{
+    if(!initial) resumeAudioGraph();
+    if(trebleFilter) trebleFilter.gain.value = v;
+  } });
+  makeKnob(modKnob, { min:0, max:1, value:0, onChange:(v, initial)=>{
+    if(!initial) resumeAudioGraph();
+    if(lfoGain) lfoGain.gain.value = v * 0.9;
+    if(lfo) lfo.frequency.value = 2 + v*9;
+  } });
+
+  // =========================================================================
+  // Temas de cor: troca as variáveis CSS da interface inteira ao clicar
+  // em um dos botões de cor.
+  // =========================================================================
+  const THEMES = {
+    gold:   { '--wood-1':'#3a2a1c', '--wood-2':'#5c4028', '--wood-3':'#2a1d13', '--brass':'#c9a24a', '--brass-light':'#f0d382', '--amber':'#e0a458', '--amber-dim':'#7a5a30', '--cream':'#e9d9ae', '--cream-2':'#d9c48f' },
+    blue:   { '--wood-1':'#1c2c3a', '--wood-2':'#28425c', '--wood-3':'#131f2a', '--brass':'#4a8ec9', '--brass-light':'#82c0f0', '--amber':'#5ba4e0', '--amber-dim':'#305a7a', '--cream':'#ade0ec', '--cream-2':'#8fc4d9' },
+    red:    { '--wood-1':'#3a1c1e', '--wood-2':'#5c282b', '--wood-3':'#2a1314', '--brass':'#c9524a', '--brass-light':'#f08a82', '--amber':'#e06158', '--amber-dim':'#7a3330', '--cream':'#e9b0ad', '--cream-2':'#d99590' },
+    green:  { '--wood-1':'#1c3324', '--wood-2':'#285238', '--wood-3':'#13251a', '--brass':'#4ac97a', '--brass-light':'#82f0a8', '--amber':'#5be089', '--amber-dim':'#307a4c', '--cream':'#ade9c4', '--cream-2':'#8fd9ac' },
+    purple: { '--wood-1':'#2a1c3a', '--wood-2':'#40285c', '--wood-3':'#1d132a', '--brass':'#a24ac9', '--brass-light':'#c682f0', '--amber':'#af58e0', '--amber-dim':'#5c307a', '--cream':'#d4ade9', '--cream-2':'#bd8fd9' },
+    silver: { '--wood-1':'#2c2e33', '--wood-2':'#454850', '--wood-3':'#1b1c1f', '--brass':'#b7bcc4', '--brass-light':'#e6e9ee', '--amber':'#c9ced4', '--amber-dim':'#63666b', '--cream':'#e4e6ea', '--cream-2':'#c7ccd2' }
+  };
+
+  function applyTheme(name){
+    const t = THEMES[name];
+    if(!t) return;
+    const root = document.documentElement.style;
+    Object.keys(t).forEach(key => root.setProperty(key, t[key]));
+    themeRow.querySelectorAll('.themeSwatch').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.theme === name);
+    });
+  }
+
+  themeRow.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.themeSwatch');
+    if(!btn) return;
+    applyTheme(btn.dataset.theme);
   });
-  volKnob.addEventListener('pointermove', (e)=>{
-    if(!dragging) return;
-    const delta = (startY - e.clientY) / 120;
-    const v = Math.min(1, Math.max(0, startVol + delta));
-    audio.volume = v;
-    setKnobRotation(v);
-  });
-  volKnob.addEventListener('pointerup', ()=> dragging = false);
-  volKnob.addEventListener('pointerleave', ()=> dragging = false);
 
   // Registra o service worker para permitir uso offline e instalação como app.
   // Precisa ser servido via http/https (funciona em GitHub Pages) — não funciona
