@@ -1184,8 +1184,35 @@
   // abrindo o arquivo direto como file:// no navegador.
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('sw.js').catch(err=>{
+      navigator.serviceWorker.register('sw.js').then((reg)=>{
+        // Força uma checagem de atualização toda vez que o app é aberto
+        // (importante no celular, onde o SO costuma manter o app "vivo"
+        // em segundo plano por muito tempo sem checar sozinho).
+        reg.update();
+
+        // Se detectar uma versão nova instalada, recarrega automaticamente
+        // assim que ela assumir o controle da página.
+        reg.addEventListener('updatefound', ()=>{
+          const novoSW = reg.installing;
+          if(!novoSW) return;
+          novoSW.addEventListener('statechange', ()=>{
+            if(novoSW.state === 'installed' && navigator.serviceWorker.controller){
+              // Há uma versão nova pronta — recarrega para usá-la.
+              window.location.reload();
+            }
+          });
+        });
+      }).catch(err=>{
         console.warn('Falha ao registrar o service worker:', err);
+      });
+
+      // Também recarrega quando o novo SW assume o controle (segurança extra
+      // caso o evento acima não dispare a tempo em algum navegador).
+      let jaRecarregou = false;
+      navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+        if(jaRecarregou) return;
+        jaRecarregou = true;
+        window.location.reload();
       });
     });
   }
